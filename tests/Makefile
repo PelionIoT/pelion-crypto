@@ -93,7 +93,7 @@ BINARIES := $(addsuffix $(EXEXT),$(APPS))
 
 .SILENT:
 
-.PHONY: all check test clean
+.PHONY: all check test clean prepare
 
 all: $(BINARIES)
 
@@ -137,12 +137,12 @@ $(BINARIES): %$(EXEXT): %.c $(DEP) $(FAULT_OBJ)
 
 clean:
 ifndef WINDOWS
-	rm -rf $(BINARIES) *.c *.su *.datax TESTS
+	rm -rf $(BINARIES) *.c *.su *.datax ../TESTS
 	rm -rf data_files/platform_fault.o
 else
 	del /Q /F *.c *.su *.exe *.datax
-ifneq ($(wildcard TESTS/.*),)
-	rmdir /Q /S TESTS
+ifneq ($(wildcard ../TESTS/.*),)
+	rmdir /Q /S ../TESTS
 endif
 endif
 
@@ -152,20 +152,25 @@ check: $(BINARIES)
 
 test: check
 
+prepare:
+	echo "  Prep  ../TESTS"
+	mkdir -p "../TESTS/host_tests"
+	cp -f ./scripts/mbedtls_test.py ../TESTS/host_tests
+
 # Create separate targets for generating embedded tests.
 EMBEDDED_TESTS := $(addprefix embedded_,$(APPS))
 
 # Generate test code for target.
 
 .SECONDEXPANSION:
-$(EMBEDDED_TESTS): embedded_%: suites/$$(firstword $$(subst ., ,$$*)).function suites/%.data scripts/generate_test_code.py suites/helpers.function suites/main_test.function suites/target_test.function
-	echo "  Gen  ./TESTS/mbedtls/$*/$*.c"
+$(EMBEDDED_TESTS): embedded_%: suites/$$(firstword $$(subst ., ,$$*)).function suites/%.data scripts/generate_test_code.py suites/helpers.function suites/main_test.function suites/target_test.function prepare
+	echo "  Gen  ../TESTS/mbedtls/$*/$*.c"
 	$(PYTHON) scripts/generate_test_code.py -f suites/$(firstword $(subst ., ,$*)).function \
 		-d suites/$*.data \
 		-t suites/main_test.function \
 		-p suites/target_test.function \
 		-s suites  \
 		--helpers-file suites/helpers.function \
-		-o ./TESTS/mbedtls/$*
+		-o ../TESTS/mbedtls/$*
 
 generate-target-tests: $(EMBEDDED_TESTS)
