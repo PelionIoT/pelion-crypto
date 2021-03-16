@@ -372,6 +372,10 @@ int execute_tests( int args, const char ** argv )
     GREENTEA_SETUP( 800, "mbedtls_test" );
     greentea_send_kv( "GO", " " );
 
+#if defined(MBEDTLS_USE_TINYCRYPT)
+    uECC_set_rng( &uecc_rng_wrapper );
+#endif
+
     while ( 1 )
     {
         ret = 0;
@@ -437,4 +441,3 @@ int execute_tests( int args, const char ** argv )
     }
     return( 0 );
 }
-
