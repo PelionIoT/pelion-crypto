@@ -601,7 +601,7 @@ static int uecc_rng_wrapper( uint8_t *dest, unsigned int size )
 }
 #endif /* MBEDTLS_USE_TINYCRYPT */
 
-#if defined(MBEDTLS_ENTROPY_HARDWARE_ALT)
+#if defined(MBEDTLS_ENTROPY_HARDWARE_ALT) && !defined(DEVICE_TRNG)
 int mbedtls_hardware_poll( void *data, unsigned char *output,
                            size_t len, size_t *olen )
 {
