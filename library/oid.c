@@ -177,6 +177,7 @@ typedef struct {
     const char          *short_name;
 } oid_x520_attr_t;
 
+#if defined(MBEDTLS_X509_CRT_WRITE_C) || !defined(MBEDTLS_X509_REMOVE_INFO)
 static const oid_x520_attr_t oid_x520_attr_type[] =
 {
     {
@@ -263,6 +264,7 @@ static const oid_x520_attr_t oid_x520_attr_type[] =
 
 FN_OID_TYPED_FROM_ASN1(oid_x520_attr_t, x520_attr, oid_x520_attr_type)
 FN_OID_GET_ATTR1(mbedtls_oid_get_attr_short_name, oid_x520_attr_t, x520_attr, const char *, short_name)
+#endif /* MBEDTLS_X509_CRT_WRITE_C || !MBEDTLS_X509_REMOVE_INFO */
 
 /*
  * For X509 extensions
