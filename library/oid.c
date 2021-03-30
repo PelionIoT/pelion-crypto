@@ -583,7 +583,7 @@ FN_OID_GET_OID_BY_ATTR1(mbedtls_oid_get_oid_by_ec_grp, oid_ecp_grp_t, oid_ecp_gr
 #endif /* MBEDTLS_ECP_C */
 #endif
 
-#if defined(MBEDTLS_CIPHER_C)
+#if defined(MBEDTLS_CIPHER_C) && defined(MBEDTLS_PKCS5_C)
 /*
  * For PKCS#5 PBES2 encryption algorithm
  */
@@ -610,9 +610,9 @@ static const oid_cipher_alg_t oid_cipher_alg[] =
 
 FN_OID_TYPED_FROM_ASN1(oid_cipher_alg_t, cipher_alg, oid_cipher_alg)
 FN_OID_GET_ATTR1(mbedtls_oid_get_cipher_alg, oid_cipher_alg_t, cipher_alg, mbedtls_cipher_type_t, cipher_alg)
-#endif /* MBEDTLS_CIPHER_C */
+#endif /* MBEDTLS_CIPHER_C && MBEDTLS_PKCS5_C */
 
-#if defined(MBEDTLS_MD_C)
+#if (defined(MBEDTLS_RSA_C) && defined(MBEDTLS_PKCS1_V15)) || defined(MBEDTLS_PKCS11_C) || defined(MBEDTLS_X509_RSASSA_PSS_SUPPORT)
 /*
  * For digestAlgorithm
  */
@@ -677,6 +677,9 @@ FN_OID_TYPED_FROM_ASN1(oid_md_alg_t, md_alg, oid_md_alg)
 FN_OID_GET_ATTR1(mbedtls_oid_get_md_alg, oid_md_alg_t, md_alg, mbedtls_md_type_t, md_alg)
 FN_OID_GET_OID_BY_ATTR1(mbedtls_oid_get_oid_by_md, oid_md_alg_t, oid_md_alg, mbedtls_md_type_t, md_alg)
 
+#endif /* (MBEDTLS_RSA_C && MBEDTLS_PKCS1_V15) || MBEDTLS_PKCS11_C || MBEDTLS_X509_RSASSA_PSS_SUPPORT */
+
+#if defined(MBEDTLS_PKCS5_C)
 /*
  * For HMAC digestAlgorithm
  */
@@ -721,7 +724,7 @@ static const oid_md_hmac_t oid_md_hmac[] =
 
 FN_OID_TYPED_FROM_ASN1(oid_md_hmac_t, md_hmac, oid_md_hmac)
 FN_OID_GET_ATTR1(mbedtls_oid_get_md_hmac, oid_md_hmac_t, md_hmac, mbedtls_md_type_t, md_hmac)
-#endif /* MBEDTLS_MD_C */
+#endif /* MBEDTLS_PKCS5_C */
 
 #if defined(MBEDTLS_PKCS12_C)
 /*
