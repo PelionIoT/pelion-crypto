@@ -951,6 +951,8 @@ static int mbedtls_x509_get_ext( unsigned char **p, const unsigned char *end,
     return( 0 );
 }
 #endif /* defined(MBEDTLS_X509_CRL_PARSE_C) */
+
+#if defined(MBEDTLS_X509_CRT_WRITE_C) || !defined(MBEDTLS_X509_REMOVE_INFO)
 /*
  * Store the name in printable form into buf; no more
  * than size characters will be written
@@ -1012,6 +1014,7 @@ int mbedtls_x509_dn_gets( char *buf, size_t size, const mbedtls_x509_name *dn )
 
     return( (int) ( size - n ) );
 }
+#endif /* MBEDTLS_X509_CRT_WRITE_C || !MBEDTLS_X509_REMOVE_INFO */
 
 /*
  * Store the serial in printable form into buf; no more
