@@ -39,8 +39,12 @@
 #define MBEDTLS_EXIT_FAILURE    EXIT_FAILURE
 #endif
 
-#if !defined(MBEDTLS_TIMING_C)
+#if !defined(MBEDTLS_TIMING_C) && !defined(MBEDTLS_TIMING_ALT)
+#if !defined(MBEDTLS_PROGRAMS_TEST_BENCHMARK_MAIN)
 int main( void )
+#else
+int mbedtls_programs_test_benchmark_main( void )
+#endif
 {
     mbedtls_printf("MBEDTLS_TIMING_C not defined.\n");
     mbedtls_exit( 0 );
@@ -99,7 +103,7 @@ int main( void )
  */
 #define HEAP_SIZE       (1u << 16)  // 64k
 
-#define BUFSIZE         1024
+#define MAX_BUFSIZE     1024
 #define HEADER_FORMAT   "  %-24s :  "
 #define TITLE_LEN       25
 
@@ -109,7 +113,8 @@ int main( void )
     "aes_cbc, aes_gcm, aes_ccm, aes_ctx, chachapoly,\n"                 \
     "aes_cmac, des3_cmac, poly1305\n"                                   \
     "havege, ctr_drbg, hmac_drbg\n"                                     \
-    "rsa, dhm, ecdsa, ecdh.\n"
+    "rsa, dhm, ecdsa, ecdh.\n"                                          \
+    "buffer_size=%%d                 default: 1024.\n"
 
 #if defined(MBEDTLS_ERROR_C)
 #define PRINT_ERROR                                                     \
@@ -120,6 +125,7 @@ int main( void )
         mbedtls_printf( "FAILED: -0x%04x\n", -ret );
 #endif
 
+#if !defined(MBEDTLS_PROGRAMS_TEST_BENCHMARK_MAIN)
 #define TIME_AND_TSC( TITLE, CODE )                                     \
 do {                                                                    \
     unsigned long ii, jj, tsc;                                          \
@@ -147,11 +153,41 @@ do {                                                                    \
     else                                                                \
     {                                                                   \
         mbedtls_printf( "%9lu KiB/s,  %9lu cycles/byte\n",              \
-                         ii * BUFSIZE / 1024,                           \
+                         ii * bufsize / 1024,                           \
                          ( mbedtls_timing_hardclock() - tsc )           \
-                         / ( jj * BUFSIZE ) );                          \
+                         / ( jj * bufsize ) );                          \
     }                                                                   \
 } while( 0 )
+
+#else
+// A simpler version, which does not bother on cycle count calculations,
+// as the test takes forever with the default 1024 loop counter and the cycle
+// count function does not really work for now on this platform
+#define TIME_AND_TSC( TITLE, CODE )                                     \
+do {                                                                    \
+    unsigned long ii;                                                   \
+    int ret = 0;                                                        \
+                                                                        \
+    mbedtls_printf( HEADER_FORMAT, TITLE );                             \
+    fflush( stdout );                                                   \
+                                                                        \
+    mbedtls_set_alarm( 1 );                                             \
+    for( ii = 1; ret == 0 && ! mbedtls_timing_alarmed; ii++ )           \
+    {                                                                   \
+        ret = CODE;                                                     \
+    }                                                                   \
+                                                                        \
+    if( ret != 0 )                                                      \
+    {                                                                   \
+        PRINT_ERROR;                                                    \
+    }                                                                   \
+    else                                                                \
+    {                                                                   \
+        mbedtls_printf( "%9lu B/s (chunk size: %d)\n",                  \
+                         ii * bufsize, bufsize );                       \
+    }                                                                   \
+} while( 0 )
+#endif
 
 #if defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C) && defined(MBEDTLS_MEMORY_DEBUG)
 
@@ -256,7 +292,7 @@ void ecp_clear_precomputed( mbedtls_ecp_group *grp )
 #define ecp_clear_precomputed( g )
 #endif
 
-unsigned char buf[BUFSIZE];
+unsigned char buf[MAX_BUFSIZE];
 
 typedef struct {
     char md4, md5, ripemd160, sha1, sha256, sha512,
@@ -269,7 +305,7 @@ typedef struct {
          rsa, dhm, ecdsa, ecdh;
 } todo_list;
 
-#if defined(MBEDTLS_ENTROPY_HARDWARE_ALT)
+#if defined(MBEDTLS_ENTROPY_HARDWARE_ALT) && !defined(DEVICE_TRNG)
 int mbedtls_hardware_poll( void *data, unsigned char *output,
                            size_t len, size_t *olen )
 {
@@ -282,15 +318,25 @@ int mbedtls_hardware_poll( void *data, unsigned char *output,
 }
 #endif
 
+// There is a need to call this from another app (which already has main()),
+// so allow exporting the test functionality as-is, just with unique function name.
+#if defined(MBEDTLS_PROGRAMS_TEST_BENCHMARK_MAIN)
+int mbedtls_programs_test_benchmark_main( int argc, const char *argv[] )
+#else
 int main( int argc, char *argv[] )
+#endif
 {
     int i;
+    char *q;
     unsigned char tmp[200];
     char title[TITLE_LEN];
     todo_list todo;
 #if defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C)
     unsigned char alloc_buf[HEAP_SIZE] = { 0 };
 #endif
+    // The buffer size to run each iteration for in tests.
+    // This may be overridden with "buffer-16", "buffer-64" and "buffer-1024" options
+    size_t bufsize = 1024;
 
     if( argc <= 1 )
     {
@@ -302,7 +348,30 @@ int main( int argc, char *argv[] )
 
         for( i = 1; i < argc; i++ )
         {
-            if( strcmp( argv[i], "md4" ) == 0 )
+            if( ( q = strchr( argv[i], '=' ) ) != NULL )
+            {
+                *q++ = '\0';
+                if( strcmp( argv[i], "buffer_size" ) == 0 )
+                {
+                    int buffer_size = atoi( q );
+                    if( buffer_size > MAX_BUFSIZE || buffer_size < 1 )
+                    {
+                        mbedtls_printf( "Buffer size value out of range. Resetting to %u", MAX_BUFSIZE );
+                        buffer_size = MAX_BUFSIZE;
+                    }
+                    bufsize = buffer_size;
+
+                    // Enable all tests if this is the only argument
+                    if( argc <= 2 )
+                        memset( &todo, 1, sizeof( todo ) );
+                }
+                else
+                {
+                    mbedtls_printf( "Unrecognized option: %s\n", argv[i] );
+                    mbedtls_printf( "Available options: " OPTIONS );
+                }
+            }
+            else if( strcmp( argv[i], "md4" ) == 0 )
                 todo.md4 = 1;
             else if( strcmp( argv[i], "md5" ) == 0 )
                 todo.md5 = 1;
@@ -376,32 +445,32 @@ int main( int argc, char *argv[] )
 
 #if defined(MBEDTLS_MD4_C)
     if( todo.md4 )
-        TIME_AND_TSC( "MD4", mbedtls_md4_ret( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "MD4", mbedtls_md4_ret( buf, bufsize, tmp ) );
 #endif
 
 #if defined(MBEDTLS_MD5_C)
     if( todo.md5 )
-        TIME_AND_TSC( "MD5", mbedtls_md5_ret( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "MD5", mbedtls_md5_ret( buf, bufsize, tmp ) );
 #endif
 
 #if defined(MBEDTLS_RIPEMD160_C)
     if( todo.ripemd160 )
-        TIME_AND_TSC( "RIPEMD160", mbedtls_ripemd160_ret( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "RIPEMD160", mbedtls_ripemd160_ret( buf, bufsize, tmp ) );
 #endif
 
 #if defined(MBEDTLS_SHA1_C)
     if( todo.sha1 )
-        TIME_AND_TSC( "SHA-1", mbedtls_sha1_ret( buf, BUFSIZE, tmp ) );
+        TIME_AND_TSC( "SHA-1", mbedtls_sha1_ret( buf, bufsize, tmp ) );
 #endif
 
 #if defined(MBEDTLS_SHA256_C)
     if( todo.sha256 )
-        TIME_AND_TSC( "SHA-256", mbedtls_sha256_ret( buf, BUFSIZE, tmp, 0 ) );
+        TIME_AND_TSC( "SHA-256", mbedtls_sha256_ret( buf, bufsize, tmp, 0 ) );
 #endif
 
 #if defined(MBEDTLS_SHA512_C)
     if( todo.sha512 )
-        TIME_AND_TSC( "SHA-512", mbedtls_sha512_ret( buf, BUFSIZE, tmp, 0 ) );
+        TIME_AND_TSC( "SHA-512", mbedtls_sha512_ret( buf, bufsize, tmp, 0 ) );
 #endif
 
 #if defined(MBEDTLS_ARC4_C)
@@ -410,7 +479,7 @@ int main( int argc, char *argv[] )
         mbedtls_arc4_context arc4;
         mbedtls_arc4_init( &arc4 );
         mbedtls_arc4_setup( &arc4, tmp, 32 );
-        TIME_AND_TSC( "ARC4", mbedtls_arc4_crypt( &arc4, BUFSIZE, buf, buf ) );
+        TIME_AND_TSC( "ARC4", mbedtls_arc4_crypt( &arc4, bufsize, buf, buf ) );
         mbedtls_arc4_free( &arc4 );
     }
 #endif
@@ -423,7 +492,7 @@ int main( int argc, char *argv[] )
         mbedtls_des3_init( &des3 );
         mbedtls_des3_set3key_enc( &des3, tmp );
         TIME_AND_TSC( "3DES",
-                mbedtls_des3_crypt_cbc( &des3, MBEDTLS_DES_ENCRYPT, BUFSIZE, tmp, buf, buf ) );
+                mbedtls_des3_crypt_cbc( &des3, MBEDTLS_DES_ENCRYPT, bufsize, tmp, buf, buf ) );
         mbedtls_des3_free( &des3 );
     }
 
@@ -433,7 +502,7 @@ int main( int argc, char *argv[] )
         mbedtls_des_init( &des );
         mbedtls_des_setkey_enc( &des, tmp );
         TIME_AND_TSC( "DES",
-                mbedtls_des_crypt_cbc( &des, MBEDTLS_DES_ENCRYPT, BUFSIZE, tmp, buf, buf ) );
+                mbedtls_des_crypt_cbc( &des, MBEDTLS_DES_ENCRYPT, bufsize, tmp, buf, buf ) );
         mbedtls_des_free( &des );
     }
 
@@ -451,7 +520,7 @@ int main( int argc, char *argv[] )
 
         TIME_AND_TSC( "3DES-CMAC",
                       mbedtls_cipher_cmac( cipher_info, tmp, 192, buf,
-                      BUFSIZE, output ) );
+                      bufsize, output ) );
     }
 #endif /* MBEDTLS_CMAC_C */
 #endif /* MBEDTLS_DES_C */
@@ -472,7 +541,7 @@ int main( int argc, char *argv[] )
             mbedtls_aes_setkey_enc( &aes, tmp, keysize );
 
             TIME_AND_TSC( title,
-                mbedtls_aes_crypt_cbc( &aes, MBEDTLS_AES_ENCRYPT, BUFSIZE, tmp, buf, buf ) );
+                mbedtls_aes_crypt_cbc( &aes, MBEDTLS_AES_ENCRYPT, bufsize, tmp, buf, buf ) );
         }
         mbedtls_aes_free( &aes );
     }
@@ -493,7 +562,7 @@ int main( int argc, char *argv[] )
             mbedtls_aes_xts_setkey_enc( &ctx, tmp, keysize * 2 );
 
             TIME_AND_TSC( title,
-                    mbedtls_aes_crypt_xts( &ctx, MBEDTLS_AES_ENCRYPT, BUFSIZE,
+                    mbedtls_aes_crypt_xts( &ctx, MBEDTLS_AES_ENCRYPT, bufsize,
                                            tmp, buf, buf ) );
 
             mbedtls_aes_xts_free( &ctx );
@@ -516,7 +585,7 @@ int main( int argc, char *argv[] )
             mbedtls_gcm_setkey( &gcm, MBEDTLS_CIPHER_ID_AES, tmp, keysize );
 
             TIME_AND_TSC( title,
-                    mbedtls_gcm_crypt_and_tag( &gcm, MBEDTLS_GCM_ENCRYPT, BUFSIZE, tmp,
+                    mbedtls_gcm_crypt_and_tag( &gcm, MBEDTLS_GCM_ENCRYPT, bufsize, tmp,
                         12, NULL, 0, buf, buf, 16, tmp ) );
 
             mbedtls_gcm_free( &gcm );
@@ -528,9 +597,14 @@ int main( int argc, char *argv[] )
     {
         int keysize;
         mbedtls_ccm_context ccm;
+#if defined(MBEDTLS_AES_ONLY_128_BIT_KEY_LENGTH)
+        const int max_key_size = 128;
+#else
+        const int max_key_size = 256;
+#endif
 
         mbedtls_ccm_init( &ccm );
-        for( keysize = 128; keysize <= 256; keysize += 64 )
+        for( keysize = 128; keysize <= max_key_size; keysize += 64 )
         {
             mbedtls_snprintf( title, sizeof( title ), "AES-CCM-%d", keysize );
 
@@ -539,7 +613,7 @@ int main( int argc, char *argv[] )
             mbedtls_ccm_setkey( &ccm, MBEDTLS_CIPHER_ID_AES, tmp, keysize );
 
             TIME_AND_TSC( title,
-                    mbedtls_ccm_encrypt_and_tag( &ccm, BUFSIZE, tmp,
+                    mbedtls_ccm_encrypt_and_tag( &ccm, bufsize, tmp,
                         12, NULL, 0, buf, buf, tmp, 16 ) );
 
             mbedtls_ccm_free( &ccm );
@@ -561,7 +635,7 @@ int main( int argc, char *argv[] )
 
         TIME_AND_TSC( title,
                 mbedtls_chachapoly_encrypt_and_tag( &chachapoly,
-                    BUFSIZE, tmp, NULL, 0, buf, buf, tmp ) );
+                    bufsize, tmp, NULL, 0, buf, buf, tmp ) );
 
         mbedtls_chachapoly_free( &chachapoly );
     }
@@ -587,13 +661,13 @@ int main( int argc, char *argv[] )
 
             TIME_AND_TSC( title,
                           mbedtls_cipher_cmac( cipher_info, tmp, keysize,
-                                               buf, BUFSIZE, output ) );
+                                               buf, bufsize, output ) );
         }
 
         memset( buf, 0, sizeof( buf ) );
         memset( tmp, 0, sizeof( tmp ) );
         TIME_AND_TSC( "AES-CMAC-PRF-128",
-                      mbedtls_aes_cmac_prf_128( tmp, 16, buf, BUFSIZE,
+                      mbedtls_aes_cmac_prf_128( tmp, 16, buf, bufsize,
                                                 output ) );
     }
 #endif /* MBEDTLS_CMAC_C */
@@ -615,7 +689,7 @@ int main( int argc, char *argv[] )
 
             TIME_AND_TSC( title,
                     mbedtls_aria_crypt_cbc( &aria, MBEDTLS_ARIA_ENCRYPT,
-                        BUFSIZE, tmp, buf, buf ) );
+                        bufsize, tmp, buf, buf ) );
         }
         mbedtls_aria_free( &aria );
     }
@@ -637,7 +711,7 @@ int main( int argc, char *argv[] )
 
             TIME_AND_TSC( title,
                     mbedtls_camellia_crypt_cbc( &camellia, MBEDTLS_CAMELLIA_ENCRYPT,
-                        BUFSIZE, tmp, buf, buf ) );
+                        bufsize, tmp, buf, buf ) );
         }
         mbedtls_camellia_free( &camellia );
     }
@@ -646,14 +720,14 @@ int main( int argc, char *argv[] )
 #if defined(MBEDTLS_CHACHA20_C)
     if ( todo.chacha20 )
     {
-        TIME_AND_TSC( "ChaCha20", mbedtls_chacha20_crypt( buf, buf, 0U, BUFSIZE, buf, buf ) );
+        TIME_AND_TSC( "ChaCha20", mbedtls_chacha20_crypt( buf, buf, 0U, bufsize, buf, buf ) );
     }
 #endif
 
 #if defined(MBEDTLS_POLY1305_C)
     if ( todo.poly1305 )
     {
-        TIME_AND_TSC( "Poly1305", mbedtls_poly1305_mac( buf, buf, BUFSIZE, buf ) );
+        TIME_AND_TSC( "Poly1305", mbedtls_poly1305_mac( buf, buf, bufsize, buf ) );
     }
 #endif
 
@@ -673,7 +747,7 @@ int main( int argc, char *argv[] )
             mbedtls_blowfish_setkey( &blowfish, tmp, keysize );
 
             TIME_AND_TSC( title,
-                    mbedtls_blowfish_crypt_cbc( &blowfish, MBEDTLS_BLOWFISH_ENCRYPT, BUFSIZE,
+                    mbedtls_blowfish_crypt_cbc( &blowfish, MBEDTLS_BLOWFISH_ENCRYPT, bufsize,
                         tmp, buf, buf ) );
         }
 
@@ -686,7 +760,7 @@ int main( int argc, char *argv[] )
     {
         mbedtls_havege_state hs;
         mbedtls_havege_init( &hs );
-        TIME_AND_TSC( "HAVEGE", mbedtls_havege_random( &hs, buf, BUFSIZE ) );
+        TIME_AND_TSC( "HAVEGE", mbedtls_havege_random( &hs, buf, bufsize ) );
         mbedtls_havege_free( &hs );
     }
 #endif
@@ -700,7 +774,7 @@ int main( int argc, char *argv[] )
         if( mbedtls_ctr_drbg_seed( &ctr_drbg, myrand, NULL, NULL, 0 ) != 0 )
             mbedtls_exit(1);
         TIME_AND_TSC( "CTR_DRBG (NOPR)",
-                mbedtls_ctr_drbg_random( &ctr_drbg, buf, BUFSIZE ) );
+                mbedtls_ctr_drbg_random( &ctr_drbg, buf, bufsize ) );
         mbedtls_ctr_drbg_free( &ctr_drbg );
 
         mbedtls_ctr_drbg_init( &ctr_drbg );
@@ -708,7 +782,7 @@ int main( int argc, char *argv[] )
             mbedtls_exit(1);
         mbedtls_ctr_drbg_set_prediction_resistance( &ctr_drbg, MBEDTLS_CTR_DRBG_PR_ON );
         TIME_AND_TSC( "CTR_DRBG (PR)",
-                mbedtls_ctr_drbg_random( &ctr_drbg, buf, BUFSIZE ) );
+                mbedtls_ctr_drbg_random( &ctr_drbg, buf, bufsize ) );
         mbedtls_ctr_drbg_free( &ctr_drbg );
     }
 #endif
@@ -731,14 +805,14 @@ int main( int argc, char *argv[] )
         if( mbedtls_hmac_drbg_seed( &hmac_drbg, md_info, myrand, NULL, NULL, 0 ) != 0 )
             mbedtls_exit(1);
         TIME_AND_TSC( "HMAC_DRBG SHA-1 (NOPR)",
-                mbedtls_hmac_drbg_random( &hmac_drbg, buf, BUFSIZE ) );
+                mbedtls_hmac_drbg_random( &hmac_drbg, buf, bufsize ) );
 
         if( mbedtls_hmac_drbg_seed( &hmac_drbg, md_info, myrand, NULL, NULL, 0 ) != 0 )
             mbedtls_exit(1);
         mbedtls_hmac_drbg_set_prediction_resistance( &hmac_drbg,
                                              MBEDTLS_HMAC_DRBG_PR_ON );
         TIME_AND_TSC( "HMAC_DRBG SHA-1 (PR)",
-                mbedtls_hmac_drbg_random( &hmac_drbg, buf, BUFSIZE ) );
+                mbedtls_hmac_drbg_random( &hmac_drbg, buf, bufsize ) );
 #endif
 
 #if defined(MBEDTLS_SHA256_C)
@@ -751,14 +825,14 @@ int main( int argc, char *argv[] )
         if( mbedtls_hmac_drbg_seed( &hmac_drbg, md_info, myrand, NULL, NULL, 0 ) != 0 )
             mbedtls_exit(1);
         TIME_AND_TSC( "HMAC_DRBG SHA-256 (NOPR)",
-                mbedtls_hmac_drbg_random( &hmac_drbg, buf, BUFSIZE ) );
+                mbedtls_hmac_drbg_random( &hmac_drbg, buf, bufsize ) );
 
         if( mbedtls_hmac_drbg_seed( &hmac_drbg, md_info, myrand, NULL, NULL, 0 ) != 0 )
             mbedtls_exit(1);
         mbedtls_hmac_drbg_set_prediction_resistance( &hmac_drbg,
                                              MBEDTLS_HMAC_DRBG_PR_ON );
         TIME_AND_TSC( "HMAC_DRBG SHA-256 (PR)",
-                mbedtls_hmac_drbg_random( &hmac_drbg, buf, BUFSIZE ) );
+                mbedtls_hmac_drbg_random( &hmac_drbg, buf, bufsize ) );
 #endif
         mbedtls_hmac_drbg_free( &hmac_drbg );
     }
@@ -1029,7 +1103,11 @@ int main( int argc, char *argv[] )
     fflush( stdout ); getchar();
 #endif
 
+#if defined(MBEDTLS_PROGRAMS_TEST_BENCHMARK_MAIN)
+    return 0;
+#else
     mbedtls_exit( 0 );
+#endif
 }
 
 #endif /* MBEDTLS_TIMING_C */
