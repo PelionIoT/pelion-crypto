@@ -40,7 +40,7 @@
 #endif
 
 #if !defined(MBEDTLS_TIMING_C) && !defined(MBEDTLS_TIMING_ALT)
-#if !defined(MBEDTLS_PROGRAMS_TEST_BENCHMARK_MAIN)
+#if !defined(TARGET_LIKE_MBED)
 int main( void )
 #else
 int mbedtls_programs_test_benchmark_main( void )
@@ -320,7 +320,7 @@ int mbedtls_hardware_poll( void *data, unsigned char *output,
 
 // There is a need to call this from another app (which already has main()),
 // so allow exporting the test functionality as-is, just with unique function name.
-#if defined(MBEDTLS_PROGRAMS_TEST_BENCHMARK_MAIN)
+#if defined(TARGET_LIKE_MBED)
 int mbedtls_programs_test_benchmark_main( int argc, const char *argv[] )
 #else
 int main( int argc, char *argv[] )
