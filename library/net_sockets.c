@@ -576,7 +576,7 @@ int mbedtls_net_recv( void *ctx, unsigned char *buf, size_t len )
  * Read at most 'len' characters, blocking for at most 'timeout' ms
  */
 int mbedtls_net_recv_timeout( void *ctx, unsigned char *buf,
-                              size_t len, uint32_t timeout )
+                              size_t len, uint16_t timeout )
 {
     int ret;
     struct timeval tv;
