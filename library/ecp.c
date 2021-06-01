@@ -187,6 +187,8 @@ typedef mbedtls_hmac_drbg_context ecp_drbg_context;
 static inline void ecp_drbg_init( ecp_drbg_context *ctx )
 {
     mbedtls_hmac_drbg_init( ctx );
+    mbedtls_hmac_drbg_set_prediction_resistance( ctx, MBEDTLS_HMAC_DRBG_PR_ON );
+    mbedtls_hmac_drbg_set_reseeding( ctx, MBEDTLS_HMAC_DRBG_NO_RESEED );
 }
 
 /* DRBG context free */
@@ -232,6 +234,8 @@ typedef mbedtls_ctr_drbg_context ecp_drbg_context;
 static inline void ecp_drbg_init( ecp_drbg_context *ctx )
 {
     mbedtls_ctr_drbg_init( ctx );
+    mbedtls_ctr_drbg_set_prediction_resistance( ctx, MBEDTLS_CTR_DRBG_PR_ON );
+    mbedtls_ctr_drbg_set_reseeding( ctx, MBEDTLS_CTR_DRBG_NO_RESEED );
 }
 
 /* DRBG context free */
