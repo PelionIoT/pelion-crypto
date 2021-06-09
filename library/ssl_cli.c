@@ -765,7 +765,7 @@ static int ssl_generate_random( mbedtls_ssl_context *ssl )
  * \return          0 if valid, else 1
  */
 static int ssl_validate_ciphersuite(
-    const mbedtls_ssl_ciphersuite_t * suite_info,
+    const mbedtls_ssl_ciphersuite_handle_t suite_info,
     const mbedtls_ssl_context * ssl,
     int min_minor_ver, int max_minor_ver )
 {
