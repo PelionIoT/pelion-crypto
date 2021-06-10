@@ -235,7 +235,6 @@ static inline void ecp_drbg_init( ecp_drbg_context *ctx )
 {
     mbedtls_ctr_drbg_init( ctx );
     mbedtls_ctr_drbg_set_prediction_resistance( ctx, MBEDTLS_CTR_DRBG_PR_ON );
-    mbedtls_ctr_drbg_set_reseeding( ctx, MBEDTLS_CTR_DRBG_NO_RESEED );
 }
 
 /* DRBG context free */
