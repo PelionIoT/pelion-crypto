@@ -3139,8 +3139,14 @@ int main( int argc, char *argv[] )
         ssl_async_keys.inject_error = ( opt.async_private_error < 0 ?
                                         - opt.async_private_error :
                                         opt.async_private_error );
+#if defined(MBEDTLS_CTR_DRBG_C)
         ssl_async_keys.f_rng = mbedtls_ctr_drbg_random;
         ssl_async_keys.p_rng = ctr_drbg;
+#else
+        ssl_async_keys.f_rng = mbedtls_hmac_drbg_random;
+        ssl_async_keys.p_rng = hmac_drbg;
+#endif
+
         mbedtls_ssl_conf_async_private_cb( conf,
                                            sign,
                                            decrypt,
