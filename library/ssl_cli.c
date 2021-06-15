@@ -210,8 +210,10 @@ static int ssl_write_signature_algorithms_ext( mbedtls_ssl_context *ssl,
     MBEDTLS_SSL_DEBUG_MSG( 3,
         ( "client hello, adding signature_algorithms extension" ) );
 
+#if !defined( MBEDTLS_SSL_END_FOR_EACH_SIG_HASH )
     if( ssl->conf->sig_hashes == NULL )
         return( MBEDTLS_ERR_SSL_BAD_CONFIG );
+#endif
 
     MBEDTLS_SSL_BEGIN_FOR_EACH_SIG_HASH_TLS( hash )
     ((void) hash);
