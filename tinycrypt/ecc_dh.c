@@ -163,7 +163,8 @@ int uECC_make_key(uint8_t *public_key, uint8_t *private_key)
 					rng_num_generated == 2 * NUM_ECC_WORDS*uECC_WORD_SIZE) {
 				return UECC_SUCCESS;
 			}
-			/* Erase key in case of FI */
+			/* Erase keys in case of FI */
+			mbedtls_platform_memset(private_key, 0, NUM_ECC_BYTES);
 			mbedtls_platform_memset(public_key, 0, 2*NUM_ECC_BYTES);
 			return UECC_FAULT_DETECTED;
 		}
