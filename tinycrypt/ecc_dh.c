@@ -120,13 +120,18 @@ int uECC_make_key(uint8_t *public_key, uint8_t *private_key)
 	uECC_word_t tries;
 	volatile uint8_t *public_key_dup = public_key;
 	volatile uint8_t *private_key_dup = private_key;
+	volatile int rng_num_generated;
 
 	for (tries = 0; tries < uECC_RNG_MAX_TRIES; ++tries) {
 		/* Generating _private uniformly at random: */
 		uECC_RNG_Function rng_function = uECC_get_rng();
-		if (!rng_function ||
-			rng_function((uint8_t *)_random, 2 * NUM_ECC_WORDS*uECC_WORD_SIZE) != 2 * NUM_ECC_WORDS*uECC_WORD_SIZE) {
-				return UECC_FAILURE;
+
+		rng_num_generated = 0;
+		if (!rng_function)
+			return UECC_FAILURE;
+		rng_num_generated = rng_function((uint8_t *)_random, 2 * NUM_ECC_WORDS*uECC_WORD_SIZE);
+		if(rng_num_generated != 2 * NUM_ECC_WORDS*uECC_WORD_SIZE) {
+			return UECC_FAILURE;
 		}
 
 		/* computing modular reduction of _random (see FIPS 186.4 B.4.1): */
@@ -142,26 +147,27 @@ int uECC_make_key(uint8_t *public_key, uint8_t *private_key)
 
 			/* Converting buffers to correct bit order: */
 			uECC_vli_nativeToBytes(private_key,
-						   BITS_TO_BYTES(NUM_ECC_BITS),
-						   _private);
+							BITS_TO_BYTES(NUM_ECC_BITS),
+							_private);
 			uECC_vli_nativeToBytes(public_key,
-						   NUM_ECC_BYTES,
-						   _public);
+							NUM_ECC_BYTES,
+							_public);
 			uECC_vli_nativeToBytes(public_key + NUM_ECC_BYTES,
- 						   NUM_ECC_BYTES,
-						   _public + NUM_ECC_WORDS);
+ 							NUM_ECC_BYTES,
+							_public + NUM_ECC_WORDS);
 
 			/* erasing temporary buffer that stored secret: */
 			mbedtls_platform_memset(_private, 0, NUM_ECC_BYTES);
 
-			if (private_key == private_key_dup && public_key == public_key_dup) {
+			if (private_key == private_key_dup && public_key == public_key_dup &&
+					rng_num_generated == 2 * NUM_ECC_WORDS*uECC_WORD_SIZE) {
 				return UECC_SUCCESS;
 			}
 			/* Erase key in case of FI */
 			mbedtls_platform_memset(public_key, 0, 2*NUM_ECC_BYTES);
 			return UECC_FAULT_DETECTED;
 		}
-  	}
+	}
 	return UECC_FAILURE;
 }
 
