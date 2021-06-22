@@ -1483,12 +1483,7 @@ static void XYcZ_initial_double(uECC_word_t * X1, uECC_word_t * Y1,
 				const uECC_word_t * const initial_Z)
 {
 	uECC_word_t z[NUM_ECC_WORDS];
-	if (initial_Z) {
-		uECC_vli_set(z, initial_Z);
-	} else {
-		uECC_vli_clear(z);
-		z[0] = 1;
-	}
+	uECC_vli_set(z, initial_Z);
 
 	uECC_vli_set(X2, X1);
 	uECC_vli_set(Y2, Y1);
