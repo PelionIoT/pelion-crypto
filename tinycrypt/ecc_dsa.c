@@ -151,15 +151,21 @@ int uECC_sign(const uint8_t *private_key, const uint8_t *message_hash,
 	volatile const uint8_t *message_hash_dup = message_hash;
 	volatile unsigned hash_size_dup = hash_size;
 	volatile uint8_t *signature_dup = signature;
+	volatile int rng_num_generated;
 
 	for (tries = 0; tries < uECC_RNG_MAX_TRIES; ++tries) {
 		/* Generating _random uniformly at random: */
 		uECC_RNG_Function rng_function = uECC_get_rng();
-		if (!rng_function ||
-			rng_function((uint8_t *)_random, 2*NUM_ECC_WORDS*uECC_WORD_SIZE) != 2*NUM_ECC_WORDS*uECC_WORD_SIZE) {
+		rng_num_generated = 0;
+
+		if (!rng_function)
+			return UECC_FAILURE;
+		rng_num_generated = rng_function((uint8_t *)_random, 2*NUM_ECC_WORDS*uECC_WORD_SIZE);
+		if(rng_num_generated != 2*NUM_ECC_WORDS*uECC_WORD_SIZE) {
 			return UECC_FAILURE;
 		}
 
+		mbedtls_platform_random_delay();
 		// computing k as modular reduction of _random (see FIPS 186.4 B.5.1):
 		uECC_vli_mmod(k, _random, curve_n);
 
@@ -169,7 +175,7 @@ int uECC_sign(const uint8_t *private_key, const uint8_t *message_hash,
 		    mbedtls_platform_memset(signature, 0, 2*NUM_ECC_BYTES);
 			return r;
 		}
-		if (r == UECC_SUCCESS) {
+		if (r == UECC_SUCCESS && rng_num_generated == 2*NUM_ECC_WORDS*uECC_WORD_SIZE) {
 			if (private_key_dup != private_key || message_hash_dup != message_hash ||
 				hash_size_dup != hash_size || signature_dup != signature) {
 			    mbedtls_platform_memset(signature, 0, 2*NUM_ECC_BYTES);

@@ -1483,12 +1483,8 @@ static void XYcZ_initial_double(uECC_word_t * X1, uECC_word_t * Y1,
 				const uECC_word_t * const initial_Z)
 {
 	uECC_word_t z[NUM_ECC_WORDS];
-	if (initial_Z) {
-		uECC_vli_set(z, initial_Z);
-	} else {
-		uECC_vli_clear(z);
-		z[0] = 1;
-	}
+	mbedtls_platform_random_delay();
+	uECC_vli_set(z, initial_Z);
 
 	uECC_vli_set(X2, X1);
 	uECC_vli_set(Y2, Y1);
@@ -1649,9 +1645,9 @@ int EccPoint_mult_safer(uECC_word_t * result, const uECC_word_t * point,
 	uECC_word_t s[NUM_ECC_WORDS];
 	uECC_word_t *k2[2] = {tmp, s};
 	wordcount_t num_words = NUM_ECC_WORDS;
-	uECC_word_t carry;
+	uECC_word_t carry = UINT_MAX;
 	uECC_word_t *initial_Z = 0;
-	int r = UECC_FAULT_DETECTED;
+	volatile int r = UECC_FAULT_DETECTED;
 	volatile int problem;
 
 	/* Protect against faults modifying curve paremeters in flash */
@@ -1681,17 +1677,25 @@ int EccPoint_mult_safer(uECC_word_t * result, const uECC_word_t * point,
 	/* Regularize the bitcount for the private key so that attackers cannot use a
 	 * side channel attack to learn the number of leading zeros. */
 	carry = regularize_k(scalar, tmp, s);
-
+	if(carry == UINT_MAX)	{
+		return UECC_FAULT_DETECTED;
+	}
 	/* If an RNG function was specified, get a random initial Z value to
 		 * protect against side-channel attacks such as Template SPA */
-	if (g_rng_function) {
-		if (uECC_generate_random_int(k2[carry], curve_p, num_words) != UECC_SUCCESS) {
-			r = UECC_FAILURE;
-			goto clear_and_out;
-		}
-		initial_Z = k2[carry];
+	problem = -1;
+	if (uECC_generate_random_int(k2[carry], curve_p, num_words) == UECC_SUCCESS) {
+		problem = 0;
+	} else
+	{
+		r = UECC_FAILURE;
+		goto clear_and_out;
 	}
+	initial_Z = k2[carry];
 
+	if (problem != 0) {
+		r = UECC_FAULT_DETECTED;
+		goto clear_and_out;
+	}
 	EccPoint_mult(result, point, k2[!carry], initial_Z);
 
 	/* Protect against fault injections that would make the resulting
