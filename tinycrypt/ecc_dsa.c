@@ -165,6 +165,7 @@ int uECC_sign(const uint8_t *private_key, const uint8_t *message_hash,
 			return UECC_FAILURE;
 		}
 
+		mbedtls_platform_random_delay();
 		// computing k as modular reduction of _random (see FIPS 186.4 B.5.1):
 		uECC_vli_mmod(k, _random, curve_n);
 

@@ -134,6 +134,7 @@ int uECC_make_key(uint8_t *public_key, uint8_t *private_key)
 			return UECC_FAILURE;
 		}
 
+		mbedtls_platform_random_delay();
 		/* computing modular reduction of _random (see FIPS 186.4 B.4.1): */
 		uECC_vli_mmod(_private, _random, curve_n);
 
