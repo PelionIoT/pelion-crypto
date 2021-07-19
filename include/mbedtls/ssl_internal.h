@@ -2094,7 +2094,7 @@ MBEDTLS_ALWAYS_INLINE static inline void mbedtls_ssl_update_checksum(
 {
 #if defined(MBEDTLS_SSL_PROTO_SSL3) || defined(MBEDTLS_SSL_PROTO_TLS1) || \
     defined(MBEDTLS_SSL_PROTO_TLS1_1)
-     mbedtls_md5_update_ret( &ssl->handshake->fin_md5 , buf, len );
+    mbedtls_md5_update_ret( &ssl->handshake->fin_md5 , buf, len );
     mbedtls_sha1_update_ret( &ssl->handshake->fin_sha1, buf, len );
 #endif
 #if defined(MBEDTLS_SSL_PROTO_TLS1_2)
@@ -2105,6 +2105,9 @@ MBEDTLS_ALWAYS_INLINE static inline void mbedtls_ssl_update_checksum(
     mbedtls_sha512_update_ret( &ssl->handshake->fin_sha512, buf, len );
 #endif
 #endif /* MBEDTLS_SSL_PROTO_TLS1_2 */
+(void) ssl;
+(void) buf;
+(void) len;
 }
 
 int mbedtls_ssl_calc_verify( int minor_ver,
