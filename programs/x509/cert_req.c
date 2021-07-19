@@ -256,9 +256,9 @@ int main( int argc, char *argv[] )
         }
         else if( strcmp( p, "md" ) == 0 )
         {
-            const mbedtls_md_info_t *md_info =
+            const mbedtls_md_handle_t md_info =
                 mbedtls_md_info_from_string( q );
-            if( md_info == NULL )
+            if( md_info == MBEDTLS_MD_INVALID_HANDLE )
             {
                 mbedtls_printf( "Invalid argument for option %s\n", p );
                 goto usage;
