@@ -62,10 +62,9 @@
 #define mbedtls_snprintf snprintf
 #endif
 
-#include "mbedtls/platform_util.h"
-
 #include <stdio.h>
 #include <string.h>
+#include "mbedtls/platform_util.h"
 
 #if defined(MBEDTLS_AES_C)
 #include "mbedtls/aes.h"
