@@ -2092,9 +2092,12 @@ MBEDTLS_ALWAYS_INLINE static inline void mbedtls_ssl_update_checksum(
     mbedtls_ssl_context *ssl,
     const unsigned char *buf, size_t len )
 {
+    ( (void) ssl );
+    ( (void) buf );
+    ( (void) len );
 #if defined(MBEDTLS_SSL_PROTO_SSL3) || defined(MBEDTLS_SSL_PROTO_TLS1) || \
     defined(MBEDTLS_SSL_PROTO_TLS1_1)
-     mbedtls_md5_update_ret( &ssl->handshake->fin_md5 , buf, len );
+    mbedtls_md5_update_ret( &ssl->handshake->fin_md5 , buf, len );
     mbedtls_sha1_update_ret( &ssl->handshake->fin_sha1, buf, len );
 #endif
 #if defined(MBEDTLS_SSL_PROTO_TLS1_2)
